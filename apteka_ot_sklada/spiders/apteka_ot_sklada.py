@@ -20,12 +20,18 @@ class AptekaOtSkladaSpider(scrapy.Spider):
         "https://apteka-ot-sklada.ru/catalog/uhod-za-bolnymi_-sredstva-reabilitatsii/kompressionnyy-trikotazh/golfy"
     ]
 
+    """
+    Получаем список id для доступных регионов
+    """
     def start_requests(self):
         yield scrapy.Request(
             "https://apteka-ot-sklada.ru/api/region",
             callback=self.parse_region_data
         )
 
+    """
+    Находим id Томской области, делаем запрос, чтобы найти id Томска-города
+    """
     def parse_region_data(self, response):
         regions_list = chompjs.parse_js_object(response.text)
         for region in regions_list:
@@ -36,7 +42,9 @@ class AptekaOtSkladaSpider(scrapy.Spider):
                     callback=self.parse
                 )
 
-
+    """
+    Находим id Томска, делаем запрос, чтобы идентифицировать, что мы заинтересованы только в товарах для Томска
+    """
     def parse(self, response):
         subregions_list = chompjs.parse_js_object(response.text)
         for subregion in subregions_list:
@@ -58,6 +66,9 @@ class AptekaOtSkladaSpider(scrapy.Spider):
                     }
                 )
 
+    """
+    Проходимся по выбранным нами категориям
+    """
     def parse_categories(self, response, **kwargs):
         for category_url in self.start_urls:
             yield scrapy.Request(
@@ -65,6 +76,9 @@ class AptekaOtSkladaSpider(scrapy.Spider):
                 callback=self.parse_categories_pages
             )
 
+    """
+    Собираем/переходим на ссылки по товарам, пагинация
+    """
     def parse_categories_pages(self, response):
         product_urls = response.xpath("//div[@class='goods-grid__inner']//a[@itemprop='url']/@href").getall()
         for product_url in product_urls:
@@ -79,6 +93,9 @@ class AptekaOtSkladaSpider(scrapy.Spider):
                 callback=self.parse_categories_pages
             )
 
+    """
+    Формируем item
+    """
     def parse_product_page(self, response):
         title = response.xpath("//h1//text()").get()
         json_data = self.get_json_data(response)
