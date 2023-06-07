@@ -16,5 +16,5 @@ class AptekaOtSkladaPipeline:
         return item
 
     def close_spider(self, spider):
-        with open('apteka_ot_sklada_data.json', 'a') as aot:
-            json.dump(self.items, aot)
+        with open('apteka_ot_sklada_data.json', 'w', encoding='utf-8') as aot:
+            json.dump(self.items, aot, ensure_ascii=False)
