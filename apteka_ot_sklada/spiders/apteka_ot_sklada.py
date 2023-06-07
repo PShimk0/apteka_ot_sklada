@@ -5,6 +5,7 @@ import chompjs
 class AptekaOtSkladaSpider(scrapy.Spider):
     name = 'apteka_ot_sklada_crawler'
     custom_settings = {
+        "LOG_LEVEL": "INFO",
         'ITEM_PIPELINES':
             {
                 "apteka_ot_sklada.pipelines.AptekaOtSkladaPipeline": 300
@@ -14,7 +15,9 @@ class AptekaOtSkladaSpider(scrapy.Spider):
     start_urls = [
         "https://apteka-ot-sklada.ru/catalog/kontaktnye-linzy-i-ochki/linzy-ezhednevnye",
         "https://apteka-ot-sklada.ru/catalog/sredstva-gigieny/uhod-za-polostyu-rta/zubnye-niti_-ershiki",
-        "https://apteka-ot-sklada.ru/catalog/perevyazochnye-sredstva/binty/binty-elastichnye-kompressionnye"
+        "https://apteka-ot-sklada.ru/catalog/perevyazochnye-sredstva/binty/binty-elastichnye-kompressionnye",
+        "https://apteka-ot-sklada.ru/catalog/uhod-za-bolnymi_-sredstva-reabilitatsii/kompressionnyy-trikotazh/kompressionnye-mayki_-futbolki_-shorty",
+        "https://apteka-ot-sklada.ru/catalog/uhod-za-bolnymi_-sredstva-reabilitatsii/kompressionnyy-trikotazh/golfy"
     ]
 
     def start_requests(self):
@@ -62,18 +65,21 @@ class AptekaOtSkladaSpider(scrapy.Spider):
                 callback=self.parse_categories_pages
             )
 
-    def parse_categories_pages(self, response, **kwargs):
-        city_name = response.xpath("//span[@class='ui-link__text']/text()").get()
-        print(city_name)
+    def parse_categories_pages(self, response):
         product_urls = response.xpath("//div[@class='goods-grid__inner']//a[@itemprop='url']/@href").getall()
         for product_url in product_urls:
-            product_url = 'https://apteka-ot-sklada.ru/catalog/Perchatki-hozyaystvennye-lateksnye-s-h_b-napyleniem-plotnye-r-L-para_59661559'
             yield response.follow(
                 product_url,
                 callback=self.parse_product_page
             )
+        pagination = response.xpath("//li[@class='ui-pagination__item ui-pagination__item_next']/a/@href").get()
+        if pagination:
+            yield response.follow(
+                pagination,
+                callback=self.parse_categories_pages
+            )
 
-    def parse_product_page(self, response, **kwargs):
+    def parse_product_page(self, response):
         title = response.xpath("//h1//text()").get()
         json_data = self.get_json_data(response)
         breadcrumbs = response.xpath("//ul[@class='ui-breadcrumbs__list']//li/a/span/span/text()").getall()[2:]
@@ -95,7 +101,7 @@ class AptekaOtSkladaSpider(scrapy.Spider):
                 "stock": availability,
                 "assets": assets,
                 "metadata": self.get_metadata(response, json_data),
-                "variants": 1,  # {int} Кол-во вариантов у товара в карточке (За вариант считать только цвет или объем/масса. Размер у одежды или обуви варинтами не считаются)
+                "variants": 1,
             }
 
 
@@ -113,6 +119,7 @@ class AptekaOtSkladaSpider(scrapy.Spider):
                 availability_dict['in_stock'] = True
             elif availability == 'b':
                 availability_dict['in_stock'] = False
+        availability_dict['count'] = 0
         return availability_dict
 
     def get_price(self, response):
@@ -135,6 +142,12 @@ class AptekaOtSkladaSpider(scrapy.Spider):
                 "current": current_price,
                 "original": original_price,
                 "sale_tag": f"Скидка {discount * 100}%"
+            }
+        else:
+            return {
+                "current": 0,
+                "original": 0,
+                "sale_tag": ""
             }
 
     def get_json_data(self, response):
