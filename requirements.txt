@@ -1,0 +1,4 @@
+scrapy
+chompjs
+black
+isort
